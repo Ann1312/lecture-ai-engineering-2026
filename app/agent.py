@@ -24,6 +24,7 @@ from pydantic_ai.messages import ToolCallPart, ToolReturnPart
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.providers.google import GoogleProvider
+from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults # 第3回宿題 実装レベルで追加
 
 from app import tools
 from app.config import MODEL, api_error_message, get_api_key
@@ -38,12 +39,19 @@ INSTRUCTIONS = """\
 """
 
 # モデルは実行時に渡す（テストではAPIを呼ばない TestModel に差し替えるため）
-agent = Agent(instructions=INSTRUCTIONS)
+# agent = Agent(instructions=INSTRUCTIONS) # original
+agent = Agent(
+    instructions=INSTRUCTIONS,
+    output_type=[str, DeferredToolRequests],
+) #第3回宿題 実装レベルで変更
 agent.tool_plain(tools.search_glossary)
 agent.tool_plain(tools.get_lecture_summary)
 
 # TODO(第3回 演習): tools.py に make_quiz を作り、ここで登録しよう
 agent.tool_plain(tools.make_quiz)
+
+# 第3回宿題 実装レベル：保存の前に確認を挟む
+agent.tool_plain(tools.save_learning_log, requires_approval=True)
 
 # 第5回: 使う MCP サーバーの設定ファイル。Claude Desktop や Cursor と同じ "mcpServers" 形式
 MCP_CONFIG = Path(__file__).resolve().parent / "mcp_servers.json"
@@ -130,6 +138,23 @@ def main() -> None:
         print("[tools] MCP サーバー（app/mcp_servers.json）")
     try:
         result = target.run_sync(args.question, model=build_model())
+        # 第3回宿題 実装レベルで追加
+        while isinstance(result.output, DeferredToolRequests):
+            approvals = DeferredToolResults()
+
+            for call in result.output.approvals:
+                print(f"実行するツール: {call.tool_name}")
+                print(json.dumps(call.args_as_dict(), ensure_ascii=False, indent=2))
+                answer = input("この内容を保存してよいですか？ [y/N]: ")
+                approvals.approvals[call.tool_call_id] = (
+                    answer.strip().lower() == "y"
+                )
+
+            result = target.run_sync(
+                model=build_model(),
+                message_history=result.all_messages(),
+                deferred_tool_results=approvals,
+            )
     except ModelHTTPError as e:
         print(api_error_message(e.status_code, str(e.body)[:200]))
         raise SystemExit(1)

@@ -100,3 +100,20 @@ def make_quiz(lecture: int) -> str:
         },
         ensure_ascii=False,
     )
+
+# 第三回宿題　実装レベル
+def save_learning_log(lecture: int, topic: str, content: str) -> str:
+    """指定した回の学習テーマと学んだ内容を、学習記録として保存する。
+    利用者が学習内容の記録・保存を求めたときに使う。
+    """
+    log_dir = DATA_DIR.parent / "learning_log"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    entry = {
+    "lecture": lecture,
+    "topic": topic,
+    "content": content,
+    }
+    log_path = log_dir / "learning_log.jsonl"
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return f"第{lecture}回の学習記録「{topic}」を保存しました。"
