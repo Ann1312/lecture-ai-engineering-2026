@@ -127,7 +127,7 @@ def search_materials(query: str) -> str:
     """
     from google.genai.errors import APIError
     import sqlite3
-    # 第五回宿題 実装レベル 
+    # 第五回宿題 実装レベル
     from app.retrieval import search_with_neighbors as search
 
     try:
